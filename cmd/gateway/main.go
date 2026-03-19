@@ -1,52 +1,36 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"log"
+
 	"market-data-gateway/internal/exchange"
-	"market-data-gateway/internal/orderbook"
+	"market-data-gateway/internal/pipeline"
 	"market-data-gateway/pkg/types"
 )
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	manager := orderbook.NewManager()
+	updates := make(chan types.Update, 100)
 
-	// Test Binance
-	fmt.Println("BINANCE")
-	binance := exchange.NewBinanceClient()
-	btcBinance, err := binance.FetchSnapshot("BTCUSDT")
-	if err != nil {
-		log.Printf("Binance error: %v\n", err)
-	} else {
-		manager.SetSnapshot(btcBinance)
-		printOrderBook(btcBinance)
+	streams := []pipeline.StreamConfig{
+		{
+			Streamer: exchange.NewBinanceClient(),
+			Symbol:   "BTCUSDT",
+		},
 	}
 
-	// Test Kraken
-	fmt.Println("KRAKEN")
-	kraken := exchange.NewKrakenClient()
-	btcKraken, err := kraken.FetchSnapshot("XBTUSD")
-	if err != nil {
-		log.Printf("Kraken error: %v\n", err)
-	} else {
-		manager.SetSnapshot(btcKraken)
-		printOrderBook(btcKraken)
-	}
-}
+	go pipeline.Run(ctx, streams, updates)
 
-func printOrderBook(book *types.OrderBook) {
-	fmt.Printf("Exchange: %s\n", book.Exchange)
-	fmt.Printf("Symbol: %s\n", book.Symbol)
-	fmt.Printf("Timestamp: %d\n", book.Timestamp)
-
-	fmt.Println("\nBids:")
-	for _, bid := range book.Bids {
-		fmt.Printf(" Price: %.2f - Quantity: %.4f\n", bid.Price, bid.Quantity)
-	}
-
-	fmt.Println("\nAsks:")
-	for _, ask := range book.Asks {
-		fmt.Printf(" Price: %.2f - Quantity: %.4f\n", ask.Price, ask.Quantity)
+	for {
+		select {
+		case update := <-updates:
+			fmt.Printf("Exchange: %s Symbol: %s LastUpdateID: %d Bids: %v Asks: %v\n",
+				update.Exchange, update.Symbol, update.LastUpdateID, update.Bids, update.Asks)
+		case <-ctx.Done():
+			return
+		}
 	}
 }

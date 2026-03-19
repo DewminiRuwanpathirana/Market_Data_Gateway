@@ -21,11 +21,11 @@ type binanceSnapshotResponse struct {
 }
 
 type binanceDepthUpdate struct {
+	EventType     string     `json:"e"`
 	EventTime     int64      `json:"E"`
 	Symbol        string     `json:"s"`
 	FirstUpdateID int64      `json:"U"`
 	LastUpdateID  int64      `json:"u"`
-	PrevUpdateID  int64      `json:"pu"`
 	Bids          [][]string `json:"b"`
 	Asks          [][]string `json:"a"`
 }
@@ -37,7 +37,7 @@ type BinanceClient struct {
 
 func NewBinanceClient() *BinanceClient {
 	return &BinanceClient{
-		baseURL: "https://api.binance.com/api/v3/depth?symbol=%s&limit=5",
+		baseURL: "https://api.binance.com/api/v3/depth?symbol=%s",
 		wsURL:   "wss://stream.binance.com:9443/ws/%s@depth",
 	}
 }
@@ -108,7 +108,7 @@ func (s *binanceSeq) accept(raw binanceDepthUpdate) (valid, gap bool) {
 		return valid, false
 	}
 
-	if raw.PrevUpdateID != s.prevU {
+	if raw.FirstUpdateID != s.prevU+1 {
 		return false, true // gap
 	}
 
@@ -125,8 +125,15 @@ func (b *BinanceClient) StreamUpdates(ctx context.Context, symbol string, out ch
 	}
 	defer conn.Close()
 
+	// close connection when context is cancelled
+	go func() {
+		<-ctx.Done()
+		conn.Close()
+	}()
+
 	rawCh := b.readDepthStream(conn)
 
+sync: // sync label used to restart the loop when detect a gap
 	for {
 		snapshot, err := b.FetchSnapshot(symbol)
 		if err != nil {
@@ -146,7 +153,7 @@ func (b *BinanceClient) StreamUpdates(ctx context.Context, symbol string, out ch
 
 				valid, gap := seq.accept(raw)
 				if gap {
-					break
+					continue sync
 				}
 				if !valid {
 					continue
