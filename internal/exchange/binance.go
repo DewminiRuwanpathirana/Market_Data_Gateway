@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -57,32 +56,26 @@ func (b *BinanceClient) FetchSnapshot(symbol string) (*types.OrderBook, error) {
 		return nil, fmt.Errorf("binance snapshot parse %s: %w", symbol, err)
 	}
 
-	// Convert to OrderBook type
 	book := &types.OrderBook{
 		Symbol:       symbol,
 		Exchange:     "binance",
 		Timestamp:    time.Now().UnixMilli(),
 		LastUpdateID: data.LastUpdateID,
-		Bids:         []types.PriceLevel{},
-		Asks:         []types.PriceLevel{},
+		Bids:         make(map[string]string),
+		Asks:         make(map[string]string),
 	}
 
-	// Convert bids (strings to floats)
 	for _, bid := range data.Bids {
-		pl, err := parsePriceLevel(bid)
-		if err != nil {
-			return nil, fmt.Errorf("binance snapshot bid: %w", err)
+		if len(bid) < 2 {
+			continue
 		}
-		book.Bids = append(book.Bids, pl)
+		book.Bids[bid[0]] = bid[1]
 	}
-
-	// Convert asks (strings to floats)
 	for _, ask := range data.Asks {
-		pl, err := parsePriceLevel(ask)
-		if err != nil {
-			return nil, fmt.Errorf("binance snapshot ask: %w", err)
+		if len(ask) < 2 {
+			continue
 		}
-		book.Asks = append(book.Asks, pl)
+		book.Asks[ask[0]] = ask[1]
 	}
 
 	return book, nil
@@ -100,7 +93,7 @@ func (s *binanceSeq) accept(raw binanceDepthUpdate) (valid, gap bool) {
 	}
 
 	if !s.initialized {
-		valid = raw.FirstUpdateID <= s.lastID && raw.LastUpdateID >= s.lastID
+		valid = raw.FirstUpdateID <= s.lastID && raw.LastUpdateID >= s.lastID // check if snapshot is within the update range
 		if valid {
 			s.initialized = true
 			s.prevU = raw.LastUpdateID
@@ -159,12 +152,7 @@ sync: // sync label used to restart the loop when detect a gap
 					continue
 				}
 
-				update, err := toUpdate(symbol, raw)
-				if err != nil {
-					return err
-				}
-
-				out <- update
+				out <- toUpdate(symbol, raw)
 			}
 		}
 	}
@@ -191,41 +179,28 @@ func (b *BinanceClient) readDepthStream(conn *websocket.Conn) <-chan binanceDept
 	return rawCh
 }
 
-func toUpdate(symbol string, raw binanceDepthUpdate) (types.Update, error) {
+func toUpdate(symbol string, raw binanceDepthUpdate) types.Update {
 	update := types.Update{
 		Symbol:       symbol,
 		Exchange:     "binance",
 		Timestamp:    raw.EventTime,
 		LastUpdateID: raw.LastUpdateID,
+		Bids:         make(map[string]string),
+		Asks:         make(map[string]string),
 	}
 
 	for _, b := range raw.Bids {
-		pl, err := parsePriceLevel(b)
-		if err != nil {
-			return types.Update{}, fmt.Errorf("binance bid: %w", err)
+		if len(b) < 2 {
+			continue
 		}
-		update.Bids = append(update.Bids, pl)
+		update.Bids[b[0]] = b[1]
 	}
-
 	for _, a := range raw.Asks {
-		pl, err := parsePriceLevel(a)
-		if err != nil {
-			return types.Update{}, fmt.Errorf("binance ask: %w", err)
+		if len(a) < 2 {
+			continue
 		}
-		update.Asks = append(update.Asks, pl)
+		update.Asks[a[0]] = a[1]
 	}
 
-	return update, nil
-}
-
-func parsePriceLevel(entry []string) (types.PriceLevel, error) {
-	price, err := strconv.ParseFloat(entry[0], 64)
-	if err != nil {
-		return types.PriceLevel{}, fmt.Errorf("invalid price '%s': %w", entry[0], err)
-	}
-	qty, err := strconv.ParseFloat(entry[1], 64)
-	if err != nil {
-		return types.PriceLevel{}, fmt.Errorf("invalid quantity '%s': %w", entry[1], err)
-	}
-	return types.PriceLevel{Price: price, Quantity: qty}, nil
+	return update
 }

@@ -6,19 +6,19 @@ type PriceLevel struct {
 }
 
 type OrderBook struct {
-	Symbol       string       `json:"symbol"`
-	Exchange     string       `json:"exchange"`
-	Bids         []PriceLevel `json:"bids"`
-	Asks         []PriceLevel `json:"asks"`
-	Timestamp    int64        `json:"timestamp"`
-	LastUpdateID int64        `json:"last_update_id"`
+	Symbol       string
+	Exchange     string
+	Bids         map[string]string // price → quantity
+	Asks         map[string]string // price → quantity
+	Timestamp    int64
+	LastUpdateID int64
 }
 
 type Update struct {
-	Symbol       string       `json:"symbol"`
-	Exchange     string       `json:"exchange"`
-	Bids         []PriceLevel `json:"bids"`
-	Asks         []PriceLevel `json:"asks"`
-	Timestamp    int64        `json:"timestamp"`
-	LastUpdateID int64        `json:"last_update_id"`
+	Symbol       string
+	Exchange     string
+	Bids         map[string]string // price → quantity
+	Asks         map[string]string // price → quantity
+	Timestamp    int64
+	LastUpdateID int64
 }

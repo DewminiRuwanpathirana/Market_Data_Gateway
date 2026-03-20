@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"market-data-gateway/pkg/types"
@@ -49,70 +48,30 @@ func (k *KrakenClient) FetchSnapshot(symbol string) (*types.OrderBook, error) {
 		return nil, fmt.Errorf("kraken API error: %v", data.Error)
 	}
 
-	// Convert to OrderBook type
 	book := &types.OrderBook{
 		Symbol:    symbol,
 		Exchange:  "kraken",
 		Timestamp: time.Now().UnixMilli(),
-		Bids:      []types.PriceLevel{},
-		Asks:      []types.PriceLevel{},
+		Bids:      make(map[string]string),
+		Asks:      make(map[string]string),
 	}
 
 	for _, pairData := range data.Result {
-		// Convert bids (any to floats)
 		for _, bid := range pairData.Bids {
-			priceStr, ok := bid[0].(string) // check if the price is a string
-			if !ok {
-				return nil, fmt.Errorf("invalid bid price type")
+			price, ok1 := bid[0].(string)
+			qty, ok2 := bid[1].(string)
+			if !ok1 || !ok2 {
+				return nil, fmt.Errorf("kraken snapshot: invalid bid entry")
 			}
-
-			qtyStr, ok := bid[1].(string)
-			if !ok {
-				return nil, fmt.Errorf("invalid bid quantity type")
-			}
-
-			price, err := strconv.ParseFloat(priceStr, 64)
-			if err != nil {
-				return nil, fmt.Errorf("invalid bid price '%s': %w", priceStr, err)
-			}
-
-			qty, err := strconv.ParseFloat(qtyStr, 64)
-			if err != nil {
-				return nil, fmt.Errorf("invalid bid quantity '%s': %w", qtyStr, err)
-			}
-
-			book.Bids = append(book.Bids, types.PriceLevel{
-				Price:    price,
-				Quantity: qty,
-			})
+			book.Bids[price] = qty
 		}
-
-		// Convert asks (any to floats)
 		for _, ask := range pairData.Asks {
-			priceStr, ok := ask[0].(string)
-			if !ok {
-				return nil, fmt.Errorf("invalid ask price type")
+			price, ok1 := ask[0].(string)
+			qty, ok2 := ask[1].(string)
+			if !ok1 || !ok2 {
+				return nil, fmt.Errorf("kraken snapshot: invalid ask entry")
 			}
-
-			qtyStr, ok := ask[1].(string)
-			if !ok {
-				return nil, fmt.Errorf("invalid ask quantity type")
-			}
-
-			price, err := strconv.ParseFloat(priceStr, 64)
-			if err != nil {
-				return nil, fmt.Errorf("invalid ask price '%s': %w", priceStr, err)
-			}
-
-			qty, err := strconv.ParseFloat(qtyStr, 64)
-			if err != nil {
-				return nil, fmt.Errorf("invalid ask quantity '%s': %w", qtyStr, err)
-			}
-
-			book.Asks = append(book.Asks, types.PriceLevel{
-				Price:    price,
-				Quantity: qty,
-			})
+			book.Asks[price] = qty
 		}
 	}
 
