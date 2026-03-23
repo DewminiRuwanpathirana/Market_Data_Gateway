@@ -14,7 +14,7 @@ type Manager struct {
 
 func NewManager() *Manager {
 	return &Manager{
-		books: make(map[string]*types.OrderBook),
+		books: make(map[string]*types.OrderBook), // symbol -> order book
 	}
 }
 

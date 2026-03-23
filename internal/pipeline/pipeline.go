@@ -17,15 +17,15 @@ type StreamConfig struct {
 }
 
 func Run(ctx context.Context, streams []StreamConfig, out chan<- types.Update) {
-	var wg sync.WaitGroup
+	var wg sync.WaitGroup // wait for all streamers to finish when context is cancelled
 
 	for _, s := range streams {
-		wg.Add(1)
+		wg.Add(1) // increment wait group counter for each streamer
 		go func(cfg StreamConfig) {
-			defer wg.Done()
+			defer wg.Done() // decrement counter when streamer exits
 			cfg.Streamer.StreamUpdates(ctx, cfg.Symbol, out)
 		}(s)
 	}
 
-	wg.Wait()
+	wg.Wait() // wait for all streamers to finish before exiting
 }

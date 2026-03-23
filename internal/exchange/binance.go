@@ -112,7 +112,7 @@ func (s *binanceSeq) accept(raw binanceDepthUpdate) (valid, gap bool) {
 func (b *BinanceClient) StreamUpdates(ctx context.Context, symbol string, out chan<- types.Update) error {
 	wsURL := fmt.Sprintf(b.wsURL, strings.ToLower(symbol))
 
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, wsURL, nil)
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, wsURL, nil) // opens a WebSocket connection
 	if err != nil {
 		return fmt.Errorf("binance ws %s: %w", symbol, err)
 	}

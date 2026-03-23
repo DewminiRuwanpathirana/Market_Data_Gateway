@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// converts http requests to WebSocket connections
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
@@ -22,8 +23,10 @@ type Message struct {
 	Asks     map[string]string `json:"asks"`
 }
 
+// each websocket client has a send channel to receive messages from the server
 type client struct {
-	send chan Message
+	send      chan Message
+	closeOnce sync.Once
 }
 
 type Server struct {
@@ -60,7 +63,10 @@ func (s *Server) broadcast(msg Message) {
 		select {
 		case c.send <- msg:
 		default:
-			// need to implement proper client handling and disconnection logic here
+			delete(s.clients, c)
+			c.closeOnce.Do(func() {
+				close(c.send)
+			})
 		}
 	}
 }
@@ -105,7 +111,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.mu.Lock()
 			delete(s.clients, c)
 			s.mu.Unlock()
-			close(c.send)
+			c.closeOnce.Do(func() {
+				close(c.send)
+			})
 			return
 		}
 	}
