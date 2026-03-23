@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"market-data-gateway/internal/exchange"
 	"market-data-gateway/internal/orderbook"
 	"market-data-gateway/internal/pipeline"
+	"market-data-gateway/internal/server"
 	"market-data-gateway/pkg/types"
 )
 
@@ -36,9 +38,10 @@ func main() {
 
 	go pipeline.Run(ctx, streams, updates)
 
-	for update := range updates {
-		manager.ApplyUpdate(update)
-		book := manager.GetBook("BTCUSDT")
-		fmt.Printf("bids=%d asks=%d lastUpdateID=%d\n", len(book.Bids), len(book.Asks), book.LastUpdateID)
-	}
+	srv := server.NewServer(manager)
+	go srv.Run(updates)
+
+	http.Handle("/ws", srv)
+	fmt.Println("listening on :8080")
+	http.ListenAndServe(":8080", nil)
 }

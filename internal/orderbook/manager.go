@@ -55,3 +55,13 @@ func (m *Manager) GetBook(symbol string) *types.OrderBook {
 	defer m.mu.RUnlock()
 	return m.books[symbol]
 }
+
+func (m *Manager) GetAll() []*types.OrderBook {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	books := make([]*types.OrderBook, 0, len(m.books))
+	for _, b := range m.books {
+		books = append(books, b)
+	}
+	return books
+}
