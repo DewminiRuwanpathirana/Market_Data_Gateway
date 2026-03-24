@@ -7,9 +7,8 @@ type PriceLevel struct {
 
 type OrderBook struct {
 	Symbol       string
-	Exchange     string
-	Bids         map[string]string // price → quantity
-	Asks         map[string]string // price → quantity
+	Bids         map[string]string
+	Asks         map[string]string
 	Timestamp    int64
 	LastUpdateID int64
 }
@@ -17,8 +16,8 @@ type OrderBook struct {
 type Update struct {
 	Symbol       string
 	Exchange     string
-	Bids         map[string]string // price → quantity
-	Asks         map[string]string // price → quantity
+	Bids         map[string]string
+	Asks         map[string]string
 	Timestamp    int64
 	LastUpdateID int64
 }

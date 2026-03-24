@@ -58,7 +58,6 @@ func (b *BinanceClient) FetchSnapshot(symbol string) (*types.OrderBook, error) {
 
 	book := &types.OrderBook{
 		Symbol:       symbol,
-		Exchange:     "binance",
 		Timestamp:    time.Now().UnixMilli(),
 		LastUpdateID: data.LastUpdateID,
 		Bids:         make(map[string]string),
@@ -139,7 +138,7 @@ sync: // sync label used to restart the loop when detect a gap
 			select {
 			case <-ctx.Done():
 				return nil
-			case raw, ok := <-rawCh:
+			case raw, ok := <-rawCh: // read from WebSocket stream
 				if !ok {
 					return nil
 				}

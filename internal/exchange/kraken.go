@@ -50,7 +50,6 @@ func (k *KrakenClient) FetchSnapshot(symbol string) (*types.OrderBook, error) {
 
 	book := &types.OrderBook{
 		Symbol:    symbol,
-		Exchange:  "kraken",
 		Timestamp: time.Now().UnixMilli(),
 		Bids:      make(map[string]string),
 		Asks:      make(map[string]string),
