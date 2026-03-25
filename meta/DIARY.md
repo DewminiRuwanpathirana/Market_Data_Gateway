@@ -42,3 +42,65 @@
 **Next:**
 - Complete the implementation of downstream websocket client
 - Implement Kraken WebSocket
+
+---
+
+## 2026-03-24 — Graceful shutdown and config symbol setup
+
+**Goal:** Fix graceful shutdown on Ctrl+C, remove hardcoded symbols from main, wire snapshot through the pipeline correctly and implement interfaces.
+
+**What worked:**
+- Defined 'BookStore' interface in the server package (consumer side) >> server no need to imports concrete '*orderbook.Manager'.
+- Implement greacefull shutdown.
+- Configured symbol setup - 'config.Symbols' slice include both exchange and symbols >> can easily add new symbols from config.go >> no need to modify main.
+- Snapshot sent through 'out' channel inside 'StreamUpdates' after REST fetch >> manager gets initial snapshot through the same pipeline as live updates, no separate snapshot call needed in main.
+
+**What broke (and why):**
+- 'http.ListenAndServe' blocked main forever >> Ctrl+C cancelled context but HTTP server kept running >> replaced with 'http.Server' struct and implement shutdown explicitly.
+- 'FetchSnapshot' called in main inside 'StreamUpdates' >> wrong order (snapshot before WS open) >> removed from main >> snapshot now getting from 'out' channel inside 'StreamUpdates' after WS is open and buffering.
+
+**Concept unlocked:**
+- Channel - only the sender should close a channel. 
+'updates' channel is created in main and used from pipeline, so main should close it after 'pipeline.Run' returns. 'srv.Run' only receiving that channel.
+
+**Still fuzzy:**
+- Whether 'httpSrv.Shutdown' needs a timeout context for production use
+
+**Next:**
+- Complete the implementation of downstream websocket client
+- Implement Kraken WebSocket StreamUpdates
+
+---
+
+## 2026-03-25 — Per client symbol subscription on websocket connection and order book key redesign
+
+**Goal:** Implement per client symbol subscription >> each client receives snapshot and updates only for requested symbol.
+
+**What worked:**
+- Implement per client symbol subscription.
+- created struct to keep the orderbook key (exchange and symbol) since downstram clients should get only subscribed symbol's updates.
+- Implement filtering requests in broadcast using 'c.exchange' and 'symbol' >> each client only receives updates for their subscribed symbol
+
+**What broke (and why):**
+- 'GetAll()' removed from 'BookStore' interface after switching to per-client subscription >> server no longer needs all books on connect, only the requested one >> replaced with 'GetBook'
+
+**Concept unlocked:**
+- 'http.Handler' interface - any type with 'ServeHTTP(ResponseWriter, *Request)' method satisfies it.
+'http.Handle("/ws", srv)' registers the server and HTTP router calls 'srv.ServeHTTP' automatically on every incoming request.
+```
+type Handler interface {
+    ServeHTTP(ResponseWriter, *Request)
+}
+```
+- Struct keys in Go maps -- structs with only comparable fields (strings, ints) can be used as map keys directly. 
+- If any method on a struct uses a pointer receiver, best practice is to make all the usages as pointer receivers for that struct.
+
+**Still fuzzy:**
+- Slow client - when 'c.send' channel is full during broadcast, client is removed and disconnect from server without blocking the entire broadcast loop. What is the correct way of handling slow clients?
+
+**Next:**
+- Implement Kraken WebSocket StreamUpdates
+
+---
+
+

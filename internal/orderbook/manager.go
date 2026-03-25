@@ -7,28 +7,38 @@ import (
 	"market-data-gateway/pkg/types"
 )
 
+type bookKey struct {
+	Exchange string
+	Symbol   string
+}
+
 type Manager struct {
-	books map[string]*types.OrderBook
+	books map[bookKey]*types.OrderBook
 	mu    sync.RWMutex
 }
 
 func NewManager() *Manager {
 	return &Manager{
-		books: make(map[string]*types.OrderBook), // symbol -> order book
+		books: make(map[bookKey]*types.OrderBook),
 	}
 }
 
-func (m *Manager) SetSnapshot(book *types.OrderBook) {
+func (m *Manager) InitSymbol(symbol, exchange string) {
 	m.mu.Lock()
-	m.books[book.Symbol] = book
-	m.mu.Unlock()
+	defer m.mu.Unlock()
+	m.books[bookKey{Exchange: exchange, Symbol: symbol}] = &types.OrderBook{
+		Symbol:   symbol,
+		Exchange: exchange,
+		Bids:     make(map[string]string),
+		Asks:     make(map[string]string),
+	}
 }
 
 func (m *Manager) ApplyUpdate(u types.Update) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	book, ok := m.books[u.Symbol]
+	book, ok := m.books[bookKey{Exchange: u.Exchange, Symbol: u.Symbol}]
 	if !ok {
 		return
 	}
@@ -50,18 +60,8 @@ func applyLevels(book map[string]string, updates map[string]string) {
 	}
 }
 
-func (m *Manager) GetBook(symbol string) *types.OrderBook {
+func (m *Manager) GetBook(exchange, symbol string) *types.OrderBook {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.books[symbol]
-}
-
-func (m *Manager) GetAll() []*types.OrderBook {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	books := make([]*types.OrderBook, 0, len(m.books))
-	for _, b := range m.books {
-		books = append(books, b)
-	}
-	return books
+	return m.books[bookKey{Exchange: exchange, Symbol: symbol}]
 }

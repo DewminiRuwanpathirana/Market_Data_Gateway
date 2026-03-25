@@ -58,6 +58,7 @@ func (b *BinanceClient) FetchSnapshot(symbol string) (*types.OrderBook, error) {
 
 	book := &types.OrderBook{
 		Symbol:       symbol,
+		Exchange:     "binance",
 		Timestamp:    time.Now().UnixMilli(),
 		LastUpdateID: data.LastUpdateID,
 		Bids:         make(map[string]string),
@@ -130,6 +131,16 @@ sync: // sync label used to restart the loop when detect a gap
 		snapshot, err := b.FetchSnapshot(symbol)
 		if err != nil {
 			return fmt.Errorf("binance snapshot %s: %w", symbol, err)
+		}
+
+		// send snapshot as initial state through the pipeline
+		out <- types.Update{
+			Symbol:       snapshot.Symbol,
+			Exchange:     snapshot.Exchange,
+			Bids:         snapshot.Bids,
+			Asks:         snapshot.Asks,
+			Timestamp:    snapshot.Timestamp,
+			LastUpdateID: snapshot.LastUpdateID,
 		}
 
 		seq := binanceSeq{lastID: snapshot.LastUpdateID}

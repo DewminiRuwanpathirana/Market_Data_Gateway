@@ -5,14 +5,13 @@ import (
 	"strconv"
 	"sync"
 
-	// "market-data-gateway/internal/orderbook"
 	"market-data-gateway/pkg/types"
 
 	"github.com/gorilla/websocket"
 )
 
 type BookStore interface {
-	GetAll() []*types.OrderBook
+	GetBook(exchange, symbol string) *types.OrderBook
 	ApplyUpdate(u types.Update)
 }
 
@@ -22,20 +21,27 @@ var upgrader = websocket.Upgrader{
 }
 
 type Message struct {
-	Type   string            `json:"type"`
-	Symbol string            `json:"symbol"`
-	Bids   map[string]string `json:"bids"`
-	Asks   map[string]string `json:"asks"`
+	Type     string            `json:"type"`
+	Exchange string            `json:"exchange"`
+	Symbol   string            `json:"symbol"`
+	Bids     map[string]string `json:"bids"`
+	Asks     map[string]string `json:"asks"`
+}
+
+type subscribeMsg struct {
+	Exchange string `json:"exchange"`
+	Symbol   string `json:"symbol"`
 }
 
 // each websocket client has a send channel to receive messages from the server
 type client struct {
 	send      chan Message
 	closeOnce sync.Once
+	exchange  string
+	symbol    string
 }
 
 type Server struct {
-	// manager *orderbook.Manager
 	manager BookStore
 	clients map[*client]struct{}
 	mu      sync.Mutex
@@ -47,6 +53,7 @@ func NewServer(m BookStore) *Server {
 		clients: make(map[*client]struct{}),
 	}
 }
+
 func filterZeros(levels map[string]string) map[string]string {
 	out := make(map[string]string, len(levels))
 	for price, qty := range levels {
@@ -63,10 +70,11 @@ func (s *Server) Run(updates <-chan types.Update) {
 	for update := range updates {
 		s.manager.ApplyUpdate(update)
 		s.broadcast(Message{
-			Type:   "update",
-			Symbol: update.Symbol,
-			Bids:   filterZeros(update.Bids),
-			Asks:   filterZeros(update.Asks),
+			Type:     "update",
+			Exchange: update.Exchange,
+			Symbol:   update.Symbol,
+			Bids:     filterZeros(update.Bids),
+			Asks:     filterZeros(update.Asks),
 		})
 	}
 }
@@ -75,6 +83,9 @@ func (s *Server) broadcast(msg Message) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for c := range s.clients {
+		if c.exchange != msg.Exchange || c.symbol != msg.Symbol {
+			continue
+		}
 		select {
 		case c.send <- msg:
 		default:
@@ -93,15 +104,27 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c := &client{send: make(chan Message, 256)}
+	// read subscription from client before sending data
+	var sub subscribeMsg
+	if err := conn.ReadJSON(&sub); err != nil {
+		conn.Close()
+		return
+	}
 
-	// send current snapshot for every symbol
-	for _, book := range s.manager.GetAll() {
+	c := &client{
+		send:     make(chan Message, 256),
+		exchange: sub.Exchange,
+		symbol:   sub.Symbol,
+	}
+
+	// send snapshot for the requested symbol
+	if book := s.manager.GetBook(sub.Exchange, sub.Symbol); book != nil {
 		c.send <- Message{
-			Type:   "snapshot",
-			Symbol: book.Symbol,
-			Bids:   book.Bids,
-			Asks:   book.Asks,
+			Type:     "snapshot",
+			Exchange: sub.Exchange,
+			Symbol:   book.Symbol,
+			Bids:     book.Bids,
+			Asks:     book.Asks,
 		}
 	}
 
