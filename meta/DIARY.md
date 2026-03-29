@@ -103,4 +103,27 @@ type Handler interface {
 
 ---
 
+## 2026-03-27 — Kraken WebSocket Implementation
+
+**Goal:** Implement Kraken WebSocket StreamUpdates 
+
+**What worked:**
+- Kraken WS connected and receiving book snapshots and updates correctly.
+
+**What broke (and why):**
+- Kraken sends bids/asks as named objects '{"price": 66484.6, "qty": 0.78743900}' unlike Binance (binance sends as arrays like this '["66484.6", "0.78743900"]') >> used 'krakenLevel' struct to unmarshal >> then converted to 'map[string]string' to match internal format.
+- Kraken sends bids/asks as 'float64' but internal 'OrderBook' uses 'map[string]string' >> had to convert using 'strconv.FormatFloat(price, 'f', -1, 64)' to get clean decimal strings.
+
+**Concept unlocked:**
+- Go interface implicit implementation — 'BinanceConnection' and 'KrakenConnection' both satisfy 'Streamer' just by having 'StreamUpdates' with the matching signature. No explicit declaration needed.
+
+**Still fuzzy:**
+- Kraken websocket sends both snapshot and update on the same connection >> need to check whether explicit REST snapshot fetch is still needed or WS connection is enough.
+
+**Next:**
+- Complete the Kraken websocket implementation.
+- Move hardcoded symbols, URL, port to config file.
+
+---
+
 

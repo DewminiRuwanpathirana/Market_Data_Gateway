@@ -29,20 +29,20 @@ type binanceDepthUpdate struct {
 	Asks          [][]string `json:"a"`
 }
 
-type BinanceClient struct {
+type BinanceConnection struct {
 	baseURL string
 	wsURL   string
 }
 
-func NewBinanceClient() *BinanceClient {
-	return &BinanceClient{
+func NewBinanceConnection() *BinanceConnection {
+	return &BinanceConnection{
 		baseURL: "https://api.binance.com/api/v3/depth?symbol=%s",
 		wsURL:   "wss://stream.binance.com:9443/ws/%s@depth",
 	}
 }
 
 // Gets the current order book from Binance
-func (b *BinanceClient) FetchSnapshot(symbol string) (*types.OrderBook, error) {
+func (b *BinanceConnection) FetchSnapshot(symbol string) (*types.OrderBook, error) {
 	url := fmt.Sprintf(b.baseURL, strings.ToUpper(symbol))
 
 	resp, err := http.Get(url)
@@ -109,7 +109,7 @@ func (s *binanceSeq) accept(raw binanceDepthUpdate) (valid, gap bool) {
 	return true, false
 }
 
-func (b *BinanceClient) StreamUpdates(ctx context.Context, symbol string, out chan<- types.Update) error {
+func (b *BinanceConnection) StreamUpdates(ctx context.Context, symbol string, out chan<- types.Update) error {
 	wsURL := fmt.Sprintf(b.wsURL, strings.ToLower(symbol))
 
 	conn, _, err := websocket.DefaultDialer.DialContext(ctx, wsURL, nil) // opens a WebSocket connection
@@ -124,7 +124,7 @@ func (b *BinanceClient) StreamUpdates(ctx context.Context, symbol string, out ch
 		conn.Close()
 	}()
 
-	rawCh := b.readDepthStream(conn)
+	rawCh := b.readDepthStream(conn) // starts buffering incoming WebSocket messages into a channel
 
 sync: // sync label used to restart the loop when detect a gap
 	for {
@@ -168,7 +168,7 @@ sync: // sync label used to restart the loop when detect a gap
 	}
 }
 
-func (b *BinanceClient) readDepthStream(conn *websocket.Conn) <-chan binanceDepthUpdate {
+func (b *BinanceConnection) readDepthStream(conn *websocket.Conn) <-chan binanceDepthUpdate {
 	rawCh := make(chan binanceDepthUpdate, 100)
 
 	go func() {

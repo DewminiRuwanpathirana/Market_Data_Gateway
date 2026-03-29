@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"market-data-gateway/pkg/types"
@@ -23,7 +24,9 @@ func Run(ctx context.Context, streams []StreamConfig, out chan<- types.Update) {
 		wg.Add(1) // increment wait group counter for each streamer
 		go func(cfg StreamConfig) {
 			defer wg.Done() // decrement counter when streamer exits
-			cfg.Streamer.StreamUpdates(ctx, cfg.Symbol, out)
+			if err := cfg.Streamer.StreamUpdates(ctx, cfg.Symbol, out); err != nil {
+				fmt.Println("streamer error:", cfg.Streamer, cfg.Symbol, err)
+			}
 		}(s)
 	}
 

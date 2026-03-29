@@ -29,8 +29,8 @@ func main() {
 	}()
 
 	exchanges := map[string]pipeline.Streamer{
-		"binance": exchange.NewBinanceClient(),
-		// "kraken":  exchange.NewKrakenClient(), // TODO
+		"binance": exchange.NewBinanceConnection(),
+		"kraken":  exchange.NewKrakenConnection(),
 	}
 
 	manager := orderbook.NewManager()
@@ -39,7 +39,7 @@ func main() {
 	for _, s := range config.Symbols {
 		manager.InitSymbol(s.Symbol, s.Exchange) // initialize empty order book for each symbol
 		streams = append(streams, pipeline.StreamConfig{
-			Streamer: exchanges[s.Exchange],
+			Streamer: exchanges[s.Exchange], // get the streamer object to call StreamUpdates
 			Symbol:   s.Symbol,
 		})
 	}
