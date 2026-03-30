@@ -135,6 +135,7 @@ sync: // sync label used to restart the loop when detect a gap
 
 		// send snapshot as initial state through the pipeline
 		out <- types.Update{
+			IsSnapshot:   true,
 			Symbol:       snapshot.Symbol,
 			Exchange:     snapshot.Exchange,
 			Bids:         snapshot.Bids,

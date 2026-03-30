@@ -43,8 +43,13 @@ func (m *Manager) ApplyUpdate(u types.Update) {
 		return
 	}
 
-	applyLevels(book.Bids, u.Bids)
-	applyLevels(book.Asks, u.Asks)
+	if u.IsSnapshot { // replace the entire book
+		book.Bids = u.Bids
+		book.Asks = u.Asks
+	} else { // apply incremental updates
+		applyLevels(book.Bids, u.Bids)
+		applyLevels(book.Asks, u.Asks)
+	}
 	book.Timestamp = u.Timestamp
 	book.LastUpdateID = u.LastUpdateID
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"strconv"
 	"time"
 
@@ -41,75 +40,14 @@ type krakenLevel struct {
 	Qty   float64 `json:"qty"`
 }
 
-type KrakenResponse struct {
-	Error  []string                       `json:"error"`
-	Result map[string]KrakenOrderBookData `json:"result"`
-}
-
-type KrakenOrderBookData struct {
-	Bids [][]any `json:"bids"`
-	Asks [][]any `json:"asks"`
-}
-
 type KrakenConnection struct {
-	baseURL string
-	wsURL   string
+	wsURL string
 }
 
 func NewKrakenConnection() *KrakenConnection {
 	return &KrakenConnection{
-		baseURL: "https://api.kraken.com/0/public/Depth?pair=%s&count=5",
-		wsURL:   "wss://ws.kraken.com/v2",
+		wsURL: "wss://ws.kraken.com/v2",
 	}
-}
-
-// Gets the current order book from Kraken
-func (k *KrakenConnection) FetchSnapshot(symbol string) (*types.OrderBook, error) {
-	url := fmt.Sprintf(k.baseURL, symbol)
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch: %w", err)
-	}
-	defer resp.Body.Close()
-
-	var data KrakenResponse
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, fmt.Errorf("failed to parse: %w", err)
-	}
-
-	if len(data.Error) > 0 {
-		return nil, fmt.Errorf("kraken API error: %v", data.Error)
-	}
-
-	book := &types.OrderBook{
-		Symbol:    symbol,
-		Exchange:  "kraken",
-		Timestamp: time.Now().UnixMilli(),
-		Bids:      make(map[string]string),
-		Asks:      make(map[string]string),
-	}
-
-	for _, pairData := range data.Result {
-		for _, bid := range pairData.Bids {
-			price, ok1 := bid[0].(string)
-			qty, ok2 := bid[1].(string)
-			if !ok1 || !ok2 {
-				return nil, fmt.Errorf("kraken snapshot: invalid bid entry")
-			}
-			book.Bids[price] = qty
-		}
-		for _, ask := range pairData.Asks {
-			price, ok1 := ask[0].(string)
-			qty, ok2 := ask[1].(string)
-			if !ok1 || !ok2 {
-				return nil, fmt.Errorf("kraken snapshot: invalid ask entry")
-			}
-			book.Asks[price] = qty
-		}
-	}
-
-	return book, nil
 }
 
 func (k *KrakenConnection) StreamUpdates(ctx context.Context, symbol string, out chan<- types.Update) error {
@@ -149,7 +87,7 @@ func (k *KrakenConnection) StreamUpdates(ctx context.Context, symbol string, out
 			}
 
 			for _, d := range raw.Data {
-				out <- toKrakenUpdate(d)
+				out <- toKrakenUpdate(d, raw.Type)
 			}
 		}
 	}
@@ -180,13 +118,14 @@ func (k *KrakenConnection) readBookStream(conn *websocket.Conn) <-chan krakenBoo
 	return rawCh
 }
 
-func toKrakenUpdate(d krakenBookData) types.Update {
+func toKrakenUpdate(d krakenBookData, msgType string) types.Update {
 	update := types.Update{
-		Symbol:    d.Symbol,
-		Exchange:  "kraken",
-		Timestamp: time.Now().UnixMilli(),
-		Bids:      make(map[string]string),
-		Asks:      make(map[string]string),
+		IsSnapshot: msgType == "snapshot",
+		Symbol:     d.Symbol,
+		Exchange:   "kraken",
+		Timestamp:  time.Now().UnixMilli(),
+		Bids:       make(map[string]string),
+		Asks:       make(map[string]string),
 	}
 	for _, b := range d.Bids {
 		update.Bids[strconv.FormatFloat(b.Price, 'f', -1, 64)] = strconv.FormatFloat(b.Qty, 'f', -1, 64)

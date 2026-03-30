@@ -10,6 +10,7 @@ type OrderBook struct {
 }
 
 type Update struct {
+	IsSnapshot   bool
 	Symbol       string
 	Exchange     string
 	Bids         map[string]string // price -> quantity
