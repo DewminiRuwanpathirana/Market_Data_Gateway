@@ -1,0 +1,19 @@
+server:
+  port: 8080
+
+exchanges:
+  binance:
+    base_url: "https://api.binance.com/api/v3/depth?symbol=%s"
+    ws_url: "wss://stream.binance.com:9443/ws/%s@depth"
+  kraken:
+    ws_url: "wss://ws.kraken.com/v2"
+
+symbols:
+  - exchange: binance
+    symbol: BTCUSDT
+  - exchange: binance
+    symbol: SOLUSDT
+  - exchange: kraken
+    symbol: BTC/USD
+  - exchange: kraken
+    symbol: SOL/USD

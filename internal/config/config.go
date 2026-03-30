@@ -1,13 +1,42 @@
 package config
 
-type SymbolConfig struct {
-	Exchange string
-	Symbol   string
+import (
+	"fmt"
+	"os"
+
+	"gopkg.in/yaml.v3"
+)
+
+type Config struct {
+	Server    ServerConfig              `yaml:"server"`
+	Exchanges map[string]ExchangeConfig `yaml:"exchanges"`
+	Symbols   []SymbolConfig            `yaml:"symbols"`
 }
 
-var Symbols = []SymbolConfig{
-	{Exchange: "binance", Symbol: "BTCUSDT"},
-	{Exchange: "binance", Symbol: "SOLUSDT"},
-	{Exchange: "kraken", Symbol: "BTC/USD"},
-	{Exchange: "kraken", Symbol: "SOL/USD"},
+type ServerConfig struct {
+	Port int `yaml:"port"`
+}
+
+type ExchangeConfig struct {
+	BaseURL string `yaml:"base_url"`
+	WsURL   string `yaml:"ws_url"`
+}
+
+type SymbolConfig struct {
+	Exchange string `yaml:"exchange"`
+	Symbol   string `yaml:"symbol"`
+}
+
+func Load(path string) (*Config, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open config: %w", err)
+	}
+	defer f.Close()
+
+	var cfg Config
+	if err := yaml.NewDecoder(f).Decode(&cfg); err != nil {
+		return nil, fmt.Errorf("parse config: %w", err)
+	}
+	return &cfg, nil
 }

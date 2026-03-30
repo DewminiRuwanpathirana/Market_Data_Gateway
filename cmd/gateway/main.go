@@ -17,6 +17,12 @@ import (
 )
 
 func main() {
+	cfg, err := config.Load("config.yaml")
+	if err != nil {
+		fmt.Println("failed to load config:", err)
+		os.Exit(1)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -28,15 +34,18 @@ func main() {
 		cancel()
 	}()
 
+	binanceCfg := cfg.Exchanges["binance"]
+	krakenCfg := cfg.Exchanges["kraken"]
+
 	exchanges := map[string]pipeline.Streamer{
-		"binance": exchange.NewBinanceConnection(),
-		"kraken":  exchange.NewKrakenConnection(),
+		"binance": exchange.NewBinanceConnection(binanceCfg.BaseURL, binanceCfg.WsURL),
+		"kraken":  exchange.NewKrakenConnection(krakenCfg.WsURL),
 	}
 
 	manager := orderbook.NewManager()
 
 	var streams []pipeline.StreamConfig
-	for _, s := range config.Symbols {
+	for _, s := range cfg.Symbols {
 		manager.InitSymbol(s.Symbol, s.Exchange) // initialize empty order book for each symbol
 		streams = append(streams, pipeline.StreamConfig{
 			Streamer: exchanges[s.Exchange], // get the streamer object to call StreamUpdates
@@ -56,9 +65,10 @@ func main() {
 	go srv.Run(updates)
 
 	http.Handle("/ws", srv) // route incoming WebSocket connections(clients) to the server
-	fmt.Println("listening on :8080")
+	addr := fmt.Sprintf(":%d", cfg.Server.Port)
+	fmt.Println("listening on", addr)
 
-	httpSrv := &http.Server{Addr: ":8080"}
+	httpSrv := &http.Server{Addr: addr}
 	go func() {
 		<-ctx.Done()
 		fmt.Println("shutting down...")

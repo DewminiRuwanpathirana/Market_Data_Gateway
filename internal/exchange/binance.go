@@ -34,10 +34,10 @@ type BinanceConnection struct {
 	wsURL   string
 }
 
-func NewBinanceConnection() *BinanceConnection {
+func NewBinanceConnection(baseURL, wsURL string) *BinanceConnection {
 	return &BinanceConnection{
-		baseURL: "https://api.binance.com/api/v3/depth?symbol=%s",
-		wsURL:   "wss://stream.binance.com:9443/ws/%s@depth",
+		baseURL: baseURL,
+		wsURL:   wsURL,
 	}
 }
 

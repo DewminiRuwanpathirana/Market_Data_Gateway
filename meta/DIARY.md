@@ -126,4 +126,30 @@ type Handler interface {
 
 ---
 
+## 2026-03-30 — Config file, subscription validation, Snapshot handling
+
+**Goal:** Move hardcoded config to 'config.yaml', handle subscription validation, fix snapshot handling.
+
+**What worked:**
+- Moved symbols, URLs, and port to 'config.yaml' >> now 'config.go' has structs and 'Load(path)' function >> 'main.go' loads config at startup.
+- Exchange constructors now use URLs as parameters instead of hardcoding.
+- Added 'IsSnapshot' flag to 'types.Update' >> 'ApplyUpdate' now replace entire book on snapshot instead of merging >> fix stale data on WS reconnection.
+- Added subscription validation in 'ServeHTTP' >> bad JSON sends error message back to client instead of disconnecting.
+- Added 'omitempty' to 'Message' struct fields >> error message not include empty bids/asks/exchange fields.
+
+**What broke (and why):**
+- 'ApplyUpdate' always merged incoming data into the existing order book >> kraken send fresh snapshot when reconnects but old price levels remained in order book >> stale data in order book >> fixed by adding 'IsSnapshot' flag >> snapshot now replaces the entire book instead of merging.
+
+**Concept unlocked:**
+- Hardcoded config requires recompile to change symbols or URLs >> moving to 'config.yaml' >> only require edit the file and restart, no code change needed.
+
+**Still fuzzy:**
+- buffer sizes for channels
+
+**Next:**
+- Add tests
+- Add DESIGN.md
+
+---
+
 

@@ -44,9 +44,9 @@ type KrakenConnection struct {
 	wsURL string
 }
 
-func NewKrakenConnection() *KrakenConnection {
+func NewKrakenConnection(wsURL string) *KrakenConnection {
 	return &KrakenConnection{
-		wsURL: "wss://ws.kraken.com/v2",
+		wsURL: wsURL,
 	}
 }
 
