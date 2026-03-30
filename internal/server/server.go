@@ -22,10 +22,11 @@ var upgrader = websocket.Upgrader{
 
 type Message struct {
 	Type     string            `json:"type"`
-	Exchange string            `json:"exchange"`
-	Symbol   string            `json:"symbol"`
-	Bids     map[string]string `json:"bids"`
-	Asks     map[string]string `json:"asks"`
+	Exchange string            `json:"exchange,omitempty"`
+	Symbol   string            `json:"symbol,omitempty"`
+	Bids     map[string]string `json:"bids,omitempty"`
+	Asks     map[string]string `json:"asks,omitempty"`
+	Error    string            `json:"error,omitempty"`
 }
 
 type subscribeMsg struct {
@@ -104,11 +105,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// read subscription from client before sending data
+	// read and validate subscription from client before sending data
 	var sub subscribeMsg
-	if err := conn.ReadJSON(&sub); err != nil {
-		conn.Close()
-		return
+	for {
+		if err := conn.ReadJSON(&sub); err != nil {
+			conn.WriteJSON(Message{Type: "error", Error: "Invalid subscription message"})
+			continue
+		}
+		break
 	}
 
 	c := &client{
